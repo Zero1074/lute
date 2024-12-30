@@ -61,7 +61,14 @@ async function startBot() {
         }
     });
 }
+// ... (imports anteriores)
+import handler from "./handler.js"
 
+// En el evento messages.upsert:
+sock.ev.on("messages.upsert", async ({ messages }) => {
+    const m = messages[0]
+    await handler(sock, m)
+})
 // Crear archivo de base de datos si no existe
 await database.read();
 database.data ||= { users: [] };
