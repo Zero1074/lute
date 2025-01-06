@@ -1,15 +1,43 @@
 {
   "name": "lute-bot",
   "version": "1.0.0",
-  "description": "Bot WhatsApp",
+  "description": "A bot based on the Lute project for WhatsApp automation.",
   "main": "index.js",
-  "type": "module",
+  "author": {
+    "name": "Your Name",
+    "email": "your.email@example.com"
+  },
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://github.com/Zero1074/lute",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zero1074/lute.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Zero1074/lute/issues"
+  },
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node test.js",
+    "dev": "nodemon index.js"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.5.0",
-    "pino": "^8.15.0",
-    "qrcode-terminal": "^0.12.0"
-  }
+    "@adiwajshing/baileys": "^3.0.0",
+    "express": "^4.17.3",
+    "axios": "^0.24.0",
+    "mongoose": "^6.3.3",
+    "socket.io": "^4.4.1",
+    "chalk": "^5.0.0",
+    "dotenv": "^10.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.7"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "automation",
+    "nodejs"
+  ],
+  "type": "module"
 }
