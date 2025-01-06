@@ -1,73 +1,113 @@
-// config.js
-const config = {
-    owner: ['TuNúmero@s.whatsapp.net'], // Reemplaza con tu número
-    packname: 'Bot-MD',
-    author: 'Tu Nombre',
-    prefix: '.',  // Prefijo para los comandos
-    botName: 'Tu Bot'
+import { 
+  makeWASocket, 
+  DisconnectReason, 
+  useMultiFileAuthState,
+  fetchLatestBaileysVersion 
+} from '@whiskeysockets/baileys'
+import makeWASocket from '@whiskeysockets/baileys'
+import { Boom } from '@hapi/boom'
+import fs from 'fs'
+import chalk from 'chalk'
+import P from 'pino'
+
+const logger = P({ level: 'silent' })
+
+async function connectWhatsApp() {
+  const { state, saveCreds } = await useMultiFileAuthState('session')
+  const { version, isLatest } = await fetchLatestBaileysVersion()
+
+  console.log(chalk.green(`Usando versión de Baileys: ${version}`))
+  console.log(chalk.yellow(`¿Es la última versión? ${isLatest}`))
+
+  const sock = makeWASocket({
+    version,
+    logger,
+    printQRInTerminal: true,
+    auth: state,
+    browser: ['Lute Bot MD', 'Chrome', '4.0.0']
+  })
+
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect, qr } = update
+
+    if (qr) {
+      console.log(chalk.yellow('Escanea el código QR con tu WhatsApp'))
+    }
+
+    if (connection === 'close') {
+      const shouldReconnect = 
+        (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== 
+        DisconnectReason.loggedOut
+
+      console.log(
+        chalk.red('Conexión cerrada por: '), 
+        lastDisconnect?.error,
+        chalk.yellow(`Reconectando: ${shouldReconnect}`)
+      )
+
+      if (shouldReconnect) {
+        connectWhatsApp()
+      }
+    }
+
+    if (connection === 'open') {
+      console.log(chalk.green('Bot conectado exitosamente ✓'))
+    }
+  })
+
+  sock.ev.on('creds.update', saveCreds)
+
+  sock.ev.on('messages.upsert', async (m) => {
+    try {
+      const msg = m.messages[0]
+      if (!msg.message) return
+
+      const sender = msg.key.remoteJid
+      const text = msg.message?.conversation || 
+                   msg.message?.extendedTextMessage?.text || ''
+
+      console.log(chalk.blue('Mensaje recibido:'), text)
+
+      // Comando .menu
+      if (text.toLowerCase() === '.menu') {
+        const menuMessage = `
+*🤖 Lute Bot MD - Menú Principal 🤖*
+
+👋 ¡Bienvenido! Aquí están mis comandos:
+
+*INFORMACIÓN*
+• .menu - Muestra este menú
+• .ping - Verificar estado del bot
+
+*DIVERSIÓN*
+• .dado - Lanza un dado
+• .verdad - Juego de verdad
+• .reto - Juego de reto
+
+*UTILIDADES*
+• .sticker - Convierte imagen a sticker
+• .imagen - Genera imágenes con IA
+`
+
+        await sock.sendMessage(sender, { text: menuMessage })
+      }
+
+      // Comando .ping
+      if (text.toLowerCase() === '.ping') {
+        const start = Date.now()
+        await sock.sendMessage(sender, { text: '_Calculando ping..._ ⏳' })
+        const end = Date.now()
+        await sock.sendMessage(sender, { 
+          text: `*Pong!* 🏓\nTiempo de respuesta: *${end - start}ms*` 
+        })
+      }
+
+    } catch (error) {
+      console.error(chalk.red('Error procesando mensaje:'), error)
+    }
+  })
+
+  return sock
 }
 
-module.exports = config
-
-// index.js
-const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    DisconnectReason
-} = require('@whiskeysockets/baileys')
-const { Boom } = require('@hapi/boom')
-const pino = require('pino')
-const { join } = require('path')
-const { existsSync, mkdirSync } = require('fs')
-
-// Asegurar que existan las carpetas necesarias
-const AUTH_DIR = './auth_info'
-const TEMP_DIR = './temp'
-if (!existsSync(AUTH_DIR)) mkdirSync(AUTH_DIR)
-if (!existsSync(TEMP_DIR)) mkdirSync(TEMP_DIR)
-
-async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
-    
-    const sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: true,
-        logger: pino({ level: 'silent' }),
-        browser: ['Bot-MD', 'Chrome', '1.0.0']
-    })
-
-    // Guardar credenciales cuando se actualicen
-    sock.ev.on('creds.update', saveCreds)
-
-    // Manejar conexión
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update
-        if(connection === 'close') {
-            const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut
-            console.log('Conexión cerrada por:', lastDisconnect?.error?.message)
-            if(shouldReconnect) startBot()
-        } else if(connection === 'open') {
-            console.log('¡Bot conectado correctamente!')
-        }
-    })
-
-    // Manejar mensajes
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        const m = messages[0]
-        if (!m.message) return
-        
-        const messageType = Object.keys(m.message)[0]
-        const body = (messageType === 'conversation') ? 
-            m.message.conversation :
-            (messageType === 'extendedTextMessage') ?
-            m.message.extendedTextMessage.text : ''
-        
-        // Comando de prueba
-        if (body === '.ping') {
-            await sock.sendMessage(m.key.remoteJid, { text: '¡Pong! 🏓' })
-        }
-    })
-}
-
-// Iniciar el bot
-startBot()
+connectWhatsApp().catch(console.error)
